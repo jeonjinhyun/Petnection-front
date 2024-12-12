@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import ResponsiveLayout from '@/components/responsive-layout'
 import { PawPrintBackground } from '@/components/paw-print-background'
+import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -21,6 +22,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <PawPrintBackground />
         <ResponsiveLayout>{children}</ResponsiveLayout>
+        <Toaster />
       </body>
     </html>
   )
