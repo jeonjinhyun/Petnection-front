@@ -1,39 +1,72 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card } from "@/components/ui/card"
 import { PawPrintBackground } from '@/components/paw-print-background'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
-
-interface GoodsItem {
-  id: number
-  frontImage: string
-  backImage: string
-  description: string
-}
-
-const dummyGoods: GoodsItem[] = Array(5).fill(null).map((_, i) => ({
-  id: i + 1,
-  frontImage: "/placeholder.svg",
-  backImage: "/placeholder.svg",
-  description: `AI가 생성한 굿즈 이미지 ${i + 1}. 귀여운 반려동물 디자인.`
-}))
+import { goodsService } from '@/services/goods'
+import { GoodsItem } from '@/types/goods'
 
 export default function GoodsPage() {
-  const [goods] = useState<GoodsItem[]>(dummyGoods)
+  const [goods, setGoods] = useState<GoodsItem[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
+  const [currentPage, setCurrentPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+
+  useEffect(() => {
+    const fetchGoods = async () => {
+      try {
+        const userId = Number(localStorage.getItem('id'))
+        const response = await goodsService.getGoods(userId, currentPage)
+        setGoods(response.content)
+        setTotalPages(response.totalPages)
+      } catch (error) {
+        console.error('굿즈 로드 실패:', error)
+      }
+    }
+
+    fetchGoods()
+  }, [currentPage])
 
   const nextSlide = () => {
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % goods.length)
+    if (currentIndex === goods.length - 1) {
+      if (currentPage < totalPages - 1) {
+        setCurrentPage(prev => prev + 1)
+        setCurrentIndex(0)
+      } else {
+        setCurrentIndex(0)
+      }
+    } else {
+      setCurrentIndex(prev => prev + 1)
+    }
     setFlipped(false)
   }
 
   const prevSlide = () => {
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + goods.length) % goods.length)
+    if (currentIndex === 0) {
+      if (currentPage > 0) {
+        setCurrentPage(prev => prev - 1)
+        setCurrentIndex(goods.length - 1)
+      } else {
+        setCurrentIndex(goods.length - 1)
+      }
+    } else {
+      setCurrentIndex(prev => prev - 1)
+    }
     setFlipped(false)
+  }
+
+  if (goods.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#f3d7d0] flex items-center justify-center">
+        <div className="bg-white/90 p-8 rounded-lg text-center">
+          <p className="text-gray-600">생성된 굿즈가 없습니다.</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -42,7 +75,7 @@ export default function GoodsPage() {
       <div className="w-full max-w-sm relative">
         <AnimatePresence mode="wait">
           <motion.div
-            key={currentIndex}
+            key={`${currentPage}-${currentIndex}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -52,55 +85,41 @@ export default function GoodsPage() {
               className="bg-white/90 aspect-[3/4] cursor-pointer"
               onClick={() => setFlipped(!flipped)}
             >
-              <div className="relative w-full h-full">
-                <AnimatePresence>
-                  {flipped ? (
-                    <div
-                      key="back"
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        transform: `rotateY(${flipped ? 0 : -180}deg)`,
-                        transition: 'transform 0.3s',
-                        backfaceVisibility: 'hidden'
-                      }}
-                    >
-                      <Image
-                        src={goods[currentIndex].backImage}
-                        alt={`AI Generated ${goods[currentIndex].id}`}
-                        width={200}
-                        height={200}
-                        className="w-full h-48 object-cover rounded-lg"
-                      />
-                      <div className="absolute bottom-0 left-0 right-0 p-4 bg-black bg-opacity-50 text-white">
-                        <p className="text-sm">{goods[currentIndex].description}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      key="front"
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        transform: `rotateY(${!flipped ? 0 : 180}deg)`,
-                        transition: 'transform 0.3s',
-                        backfaceVisibility: 'hidden'
-                      }}
-                    >
-                      <Image
-                        src={goods[currentIndex].frontImage}
-                        alt={`Goods ${goods[currentIndex].id}`}
-                        width={200}
-                        height={200}
-                        className="w-full h-48 object-cover rounded-lg"
-                      />
-                    </div>
-                  )}
-                </AnimatePresence>
+              <div className="relative w-full h-full flex flex-col">
+                <div className="relative flex-1">
+                  <div 
+                    className="absolute inset-0 transition-opacity duration-500"
+                    style={{ opacity: flipped ? 1 : 0 }}
+                  >
+                    <Image
+                      src={goods[currentIndex].generatedImageUrl}
+                      alt={`Generated ${goods[currentIndex].id}`}
+                      width={500}
+                      height={500}
+                      className="w-full h-full object-cover rounded-t-lg"
+                    />
+                  </div>
+                  <div 
+                    className="absolute inset-0 transition-opacity duration-500"
+                    style={{ opacity: flipped ? 0 : 1 }}
+                  >
+                    <Image
+                      src={goods[currentIndex].originalImageUrl}
+                      alt={`Original ${goods[currentIndex].id}`}
+                      width={500}
+                      height={500}
+                      className="w-full h-full object-cover rounded-t-lg"
+                    />
+                  </div>
+                </div>
+                <div className="p-4 text-center text-gray-600">
+                  {flipped ? "클릭하여 원본 이미지 보기" : "클릭하여 생성된 이미지 보기"}
+                </div>
               </div>
             </Card>
           </motion.div>
         </AnimatePresence>
+        
         <button
           className="absolute top-1/2 left-4 transform -translate-y-1/2 bg-white/80 rounded-full p-2"
           onClick={prevSlide}

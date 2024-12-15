@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import { Home, Album, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
 import Image from 'next/image'
 
 // 더미 데이터 추가

@@ -3,8 +3,13 @@ import { LoginRequest, LoginResponse, SignupRequest } from '@/types/auth'
 
 export const authService = {
   login: async (email: string): Promise<LoginResponse> => {
-    const response = await apiClient.post<LoginResponse>('/auth/login', { email })
-    return response.data
+    try {
+      const response = await apiClient.post('/auth/login', { email })
+      return response.data
+    } catch (error) {
+      console.error('Login failed:', error)
+      throw error
+    }
   },
 
   signup: async (formData: SignupRequest): Promise<boolean> => {

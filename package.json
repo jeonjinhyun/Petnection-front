@@ -7,7 +7,7 @@
     "dev:port": "next dev -p 9151",
     "build": "SET NODE_OPTIONS=--max_old_space_size=4096 && next build",
     "start": "next start",
-    "start:port": "next start -p 9151",
+    "start:port": "SET NODE_ENV=production && next start -p 9151",
     "lint": "next lint"
   },
   "dependencies": {

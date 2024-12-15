@@ -1,5 +1,8 @@
 import apiClient from '@/lib/api-client'
 import { CommunityRoom, Post, Comment, GoodsItem } from '@/types/community'
+import axios from 'axios'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
 interface PageResponse<T> {
   content: T[];
@@ -11,37 +14,37 @@ interface PageResponse<T> {
 
 export const communityService = {
   // 커뮤니티 룸 관련
-  getRecentRooms: async (userId: number, page = 0): Promise<PageResponse<CommunityRoom>> => {
-    const response = await apiClient.get(`/community/recent/${userId}`, {
+  getRecentRooms: async (userId: number, page = 0, keyword?: string): Promise<PageResponse<CommunityRoom>> => {
+    const response = await apiClient.get(`/community/search/recent/${userId}`, {
       params: {
+        keyword: keyword || '',
         page,
-        size: 3,
-        sort: 'createdAt'
+        size: 3
       }
-    })
-    return response.data
+    });
+    return response.data;
   },
 
-  getFavoriteRooms: async (userId: number, page = 0): Promise<PageResponse<CommunityRoom>> => {
-    const response = await apiClient.get(`/community/favorites/${userId}`, {
+  getFavoriteRooms: async (userId: number, page = 0, keyword?: string): Promise<PageResponse<CommunityRoom>> => {
+    const response = await apiClient.get(`/community/search/favorites/${userId}`, {
       params: {
+        keyword: keyword || '',
         page,
-        size: 3,
-        sort: 'createdAt'
+        size: 3
       }
-    })
-    return response.data
+    });
+    return response.data;
   },
 
-  getMyRooms: async (userId: number, page = 0): Promise<PageResponse<CommunityRoom>> => {
-    const response = await apiClient.get(`/community/my/${userId}`, {
+  getMyRooms: async (userId: number, page = 0, keyword?: string): Promise<PageResponse<CommunityRoom>> => {
+    const response = await apiClient.get(`/community/search/my/${userId}`, {
       params: {
+        keyword: keyword || '',
         page,
-        size: 3,
-        sort: 'createdAt'
+        size: 3
       }
-    })
-    return response.data
+    });
+    return response.data;
   },
 
   createRoom: async (formData: FormData) => {
@@ -52,8 +55,14 @@ export const communityService = {
   },
 
   // 게시글 관련
-  getPosts: async (communityRoomId: number, page = 0) => {
-    const response = await apiClient.get(`/post/${communityRoomId}?page=${page}`)
+  getPosts: async (communityRoomId: number, page = 0): Promise<PageResponse<Post>> => {
+    const response = await apiClient.get(`/post/${communityRoomId}`, {
+      params: {
+        page,
+        size: 10,
+        sort: 'createdAt,desc'
+      }
+    })
     return response.data
   },
 
@@ -70,7 +79,7 @@ export const communityService = {
     return response.data
   },
 
-  addComment: async (data: { postId: number, content: string, userId: number }) => {
+  createComment: async (data: { author: number, content: string, postId: number }) => {
     const response = await apiClient.post('/comment', data)
     return response.data
   },

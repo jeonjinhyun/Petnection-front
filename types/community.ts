@@ -1,4 +1,3 @@
-
 export interface CommunityRoom {
   id: number
   name: string
@@ -19,18 +18,24 @@ export interface Post {
   id: number
   title: string
   content: string
-  imgUrl: string
   authorName: string
-  createdAt: string | number[];  // 두 가지 타입 모두 허용
+  imgUrl: string
+  createdAt: string | number[]
 }
 
 export interface Comment {
   id: number
+  content: string
   userProfileResponseDto: {
     name: string
-    imgUrl: string
+    imgUrl?: string
   }
+}
+
+export interface CreateCommentRequest {
+  author: number
   content: string
+  postId: number
 }
 
 export interface GoodsItem {

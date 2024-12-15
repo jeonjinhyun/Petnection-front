@@ -12,24 +12,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { useToast } from "@/components/ui/use-toast"
 import Image from 'next/image'
 import { communityService } from '@/services/community'
-
-interface Post {
-  id: number
-  title: string
-  content: string
-  authorName: string
-  imgUrl: string
-  createdAt: string
-  comments: Comment[]
-}
-
-interface Comment {
-  id: number
-  content: string
-  authorName: string
-  createdAt: string
-  userImage?: string
-}
+import { Post, Comment } from '@/types/community'
 
 const STICKY_NOTE_COLORS = [
   'bg-pink-100',
@@ -52,6 +35,19 @@ export default function BoardPage() {
   const [content, setContent] = useState('')
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [postComments, setPostComments] = useState<{ [key: number]: Comment[] }>({})
+
+  const fetchComments = async (postId: number) => {
+    try {
+      const comments = await communityService.getComments(postId)
+      setPostComments(prev => ({
+        ...prev,
+        [postId]: comments
+      }))
+    } catch (error) {
+      console.error('Failed to fetch comments:', error)
+    }
+  }
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -59,6 +55,9 @@ export default function BoardPage() {
         setIsLoading(true)
         const response = await communityService.getPosts(Number(id))
         setPosts(response.content)
+        response.content.forEach((post: Post) => {
+          fetchComments(post.id)
+        })
       } catch (error) {
         console.error('Failed to fetch posts:', error)
         toast({
@@ -112,6 +111,7 @@ export default function BoardPage() {
       formData.append('content', content)
       formData.append('communityRoomId', String(id))
       formData.append('author', userId)
+      formData.append('title', '')
 
       await communityService.createPost(formData)
       
@@ -177,6 +177,59 @@ export default function BoardPage() {
       return '-';
     }
   }
+
+  const handleCreateComment = async () => {
+    if (!newComment.trim()) {
+      toast({
+        variant: "destructive",
+        title: "오류",
+        description: "댓글 내용을 입력해주세요."
+      });
+      return;
+    }
+
+    const userId = localStorage.getItem('id');
+    if (!userId) {
+      toast({
+        variant: "destructive",
+        title: "오류",
+        description: "로그인이 필요합니다."
+      });
+      router.push('/');
+      return;
+    }
+
+    try {
+      await communityService.createComment({
+        author: Number(userId),
+        content: newComment,
+        postId: selectedPost!.id
+      });
+
+      // 해당 게시글의 댓글만 새로고침
+      const updatedComments = await communityService.getComments(selectedPost!.id);
+      setPostComments(prev => ({
+        ...prev,
+        [selectedPost!.id]: updatedComments
+      }));
+
+      setSelectedPost(null);
+      setNewComment('');
+
+      toast({
+        title: "성공",
+        description: "댓글이 작성되었습니다."
+      });
+    } catch (error) {
+      console.error('Failed to create comment:', error);
+      toast({
+        variant: "destructive",
+        title: "오류",
+        description: "댓글 작성에 실패했습니다."
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#f3d7d0] p-4 flex items-center justify-center">
@@ -205,7 +258,7 @@ export default function BoardPage() {
             </div>
           </Card>
         ) : (
-          posts.map((post) => (
+          posts.map((post: Post) => (
             <Card 
               key={post.id} 
               className="bg-white/90 p-6 space-y-4"
@@ -224,7 +277,7 @@ export default function BoardPage() {
                 />
               </div>
               <div className="space-y-2 text-center">
-              <div className="whitespace-pre-line text-xl font-bold mb-2">  {/* 스타일 수정 */}
+              <div className="whitespace-pre-line text-xl font-bold mb-2">  {/* 스타일 수 */}
                   {post.title}
                 </div>
                 <div className="whitespace-pre-line">
@@ -235,25 +288,25 @@ export default function BoardPage() {
               <div className="pt-4">
                 <ScrollArea className="w-full whitespace-nowrap">
                   <div className="flex gap-4 pb-4">
-                    {post.comments?.map((comment, index) => (
+                    {postComments[post.id]?.map((comment, index) => (
                       <div
                         key={comment.id}
                         className={`${STICKY_NOTE_COLORS[index % STICKY_NOTE_COLORS.length]} p-4 rounded-lg shadow-md min-w-[120px] max-w-[120px] h-[120px] cursor-pointer transform hover:-translate-y-1 transition-transform`}
                         onClick={() => setSelectedComment(comment)}
                       >
-                        <div className="flex items-center">
-                          <Image
-                            src={comment.userImage || "/placeholder.svg"}
-                            alt="프로필 이미지"
-                            width={40}
-                            height={40}
-                            className="w-10 h-10 rounded-full"
-                          />
-                          <p className="text-center font-medium">{comment.authorName}</p>
-                        </div>
+                        <div className="flex flex-col items-center space-y-2">
+      <Image
+        src={comment.userProfileResponseDto.imgUrl || "/placeholder.svg"}
+        alt="프로필 이미지"
+        width={40}
+        height={40}
+        className="w-10 h-10 rounded-full"
+      />
+      <p className="text-sm font-medium">{comment.userProfileResponseDto.name}</p>
+    </div>
                       </div>
                     ))}
-                    {(!post.comments || post.comments.length < 5) && (
+                    {(!postComments[post.id] || postComments[post.id].length < 5) && (
                       <button
                         onClick={() => setSelectedPost(post)}
                         className="min-w-[120px] h-[120px] border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center"
@@ -361,9 +414,8 @@ export default function BoardPage() {
           </DialogHeader>
           {selectedComment && (
             <div className="space-y-4">
-              <p className="font-medium text-lg">{selectedComment.authorName}</p>
+              <p className="font-medium text-lg">{selectedComment.userProfileResponseDto.name}</p>
               <p className="text-sm">{selectedComment.content}</p>
-              <p className="text-xs text-gray-500">{formatDate(selectedComment.createdAt)}</p>
             </div>
           )}
         </DialogContent>
@@ -381,7 +433,10 @@ export default function BoardPage() {
               onChange={(e) => setNewComment(e.target.value)}
               rows={4}
             />
-            <Button className="w-full bg-[#b38c84] hover:bg-[#96756e]">
+            <Button 
+              className="w-full bg-[#b38c84] hover:bg-[#96756e]"
+              onClick={handleCreateComment}
+            >
               작성하기
             </Button>
           </div>

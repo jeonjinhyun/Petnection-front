@@ -33,6 +33,16 @@ interface PageState {
   error: string | null
 }
 
+interface ErrorResponse {
+  response?: {
+    status: number;
+    data?: {
+      message?: string;
+    };
+  };
+  message?: string;
+}
+
 function CommunityRoomCard({ room, isMain = false, onFavoriteToggle }: { 
   room: CommunityRoom; 
   isMain?: boolean;
@@ -48,7 +58,7 @@ function CommunityRoomCard({ room, isMain = false, onFavoriteToggle }: {
     try {
       setIsLoading(true);
       await onFavoriteToggle(room.id, !room.isFavorite);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to toggle favorite:', error);
       toast({
         variant: "destructive",
@@ -123,10 +133,10 @@ export default function HomePage() {
   const { toast } = useToast()
   const router = useRouter()
 
-  const handleError = useCallback((error: any, message: string) => {
+  const handleError = useCallback((error: ErrorResponse, message: string) => {
     try {
       let errorMessage = message
-      let statusCode = error?.response?.status
+      const statusCode = error?.response?.status || 500
 
       if (error?.response?.data?.message) {
         errorMessage = error.response.data.message
@@ -165,13 +175,14 @@ export default function HomePage() {
     }
 
     try {
-      const data = await loaderMap[type](userId, page)
-      return data || { content: [] }  // 빈 배열 기본값 제공
-    } catch (error: any) {
-      handleError(error, `${type} 데이터 로드 실패`)
-      return { content: [] }  // 에러시 빈 배열 반환
+      const data = await loaderMap[type](userId, page, state.searchQuery)
+      return data || { content: [] }
+    } catch (error: unknown) {
+      const err = error as ErrorResponse
+      handleError(err, `${type} 데이터 로드 실패`)
+      return { content: [] }
     }
-  }, [handleError])
+  }, [handleError, state.searchQuery])
 
   const handleLoadMore = useCallback(async () => {
     const userId = localStorage.getItem('id')
@@ -201,8 +212,8 @@ export default function HomePage() {
           [state.activeTab]: newContent.length === 3
         }
       }))
-    } catch (error) {
-      handleError(error, '추가 데이터 로드 실패')
+    } catch (error: unknown) {
+      handleError(error as ErrorResponse, '추가 데이터 로드 실패')
     }
   }, [state.activeTab, state.pages, state.hasMore, loadData, handleError])
 
@@ -229,8 +240,8 @@ export default function HomePage() {
           }))
         }
       }
-    } catch (error) {
-      handleError(error, '탭 데이터 로드 실패')
+    } catch (error: unknown) {
+      handleError(error as ErrorResponse, '탭 데이터 로드 실패')
     } finally {
       setState(prev => ({ ...prev, isLoading: false }))
     }
@@ -291,8 +302,9 @@ export default function HomePage() {
           description: `즐겨찾기${isFavorite ? '에 추가' : '가 해제'}되었습니다.`
         });
       }
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || '즐겨찾기 처리 중 오류가 발생했습니다.';
+    } catch (error: unknown) {
+      const err = error as ErrorResponse
+      const errorMessage = err?.response?.data?.message || '즐겨찾기 처리 중 오류가 발생했습니다.';
       toast({
         variant: "destructive",
         title: "오류",
@@ -335,8 +347,8 @@ export default function HomePage() {
           },
           isLoading: false
         }))
-      } catch (error) {
-        handleError(error, "초기 데이터 로드 실패")
+      } catch (error: unknown) {
+        handleError(error as ErrorResponse, "초기 데이터 로드 실패")
       } finally {
         setState(prev => ({ ...prev, isLoading: false }))
       }
@@ -366,15 +378,45 @@ export default function HomePage() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const filteredRooms = (roomList: CommunityRoom[]) => {
-    const uniqueRooms = Array.from(
-      new Map(roomList.map(room => [room.id, room])).values()
-    );
+  const handleSearchChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newSearchQuery = e.target.value;
     
-    return uniqueRooms.filter(room =>
-      room.name.toLowerCase().includes(state.searchQuery.toLowerCase())
-    );
-  };
+    setState(prev => ({ 
+      ...prev, 
+      searchQuery: newSearchQuery,
+      isLoading: true,
+      rooms: {
+        recent: [],
+        favorite: [],
+        my: []
+      },
+      pages: { recent: 0, favorite: 0, my: 0 },
+      hasMore: { recent: true, favorite: true, my: true }
+    }));
+    
+    const userId = localStorage.getItem('id');
+    if (userId) {
+      try {
+        const data = await loadData(state.activeTab, 0, parseInt(userId));
+        setState(prev => ({
+          ...prev,
+          rooms: {
+            ...prev.rooms,
+            [state.activeTab]: data.content || []
+          },
+          isLoading: false
+        }));
+      } catch (error) {
+        handleError(error as ErrorResponse, '검색 데이터 로드 실패');
+      } finally {
+        setState(prev => ({ ...prev, isLoading: false }));
+      }
+    }
+  }, [state.activeTab, loadData, handleError]);
+
+  const getUniqueRooms = useCallback((rooms: CommunityRoom[]) => {
+    return Array.from(new Map(rooms.map(room => [room.id, room])).values());
+  }, []);
 
   if (state.error) {
     return (
@@ -397,7 +439,7 @@ export default function HomePage() {
           type="search"
           placeholder="커뮤니티룸 검색..."
           value={state.searchQuery}
-          onChange={(e) => setState(prev => ({ ...prev, searchQuery: e.target.value }))}
+          onChange={handleSearchChange}
           className="bg-white/90 backdrop-blur max-w-md mx-auto"
         />
       </div>
@@ -432,13 +474,17 @@ export default function HomePage() {
               {state.isLoading ? (
                 <div className="text-center py-4">로딩 중...</div>
               ) : (
-                filteredRooms(state.rooms[tab]).map((room) => (
-                  <CommunityRoomCard 
-                    key={`${tab}-${room.id}`} 
-                    room={room}
-                    onFavoriteToggle={handleFavoriteToggle}
-                  />
-                ))
+                getUniqueRooms(state.rooms[tab])
+                  .filter(room => 
+                    !(tab === 'recent' && room.id === state.mainPageData?.communityResponseDto?.id)
+                  )
+                  .map((room) => (
+                    <CommunityRoomCard 
+                      key={`${tab}-${room.id}`}
+                      room={room}
+                      onFavoriteToggle={handleFavoriteToggle}
+                    />
+                  ))
               )}
               {state.hasMore[tab] && <div ref={infiniteRef} className="h-10" />}
             </div>
