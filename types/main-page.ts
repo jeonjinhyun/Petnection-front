@@ -21,6 +21,7 @@ export interface MainPageResponse {
     bodyThin: number
     bodyFat: number
   }
+  petImg: string
   myRoomDto: {
     id: number
     objectDtos: Array<{

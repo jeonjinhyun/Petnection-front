@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, Album, ShoppingBag, Download, Mail } from 'lucide-react'
+import { Home, Album, ShoppingBag } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -26,8 +26,8 @@ export default function ResponsiveLayout({
     { icon: Home, label: '홈', href: '/home' },
     { icon: Album, label: '앨범', href: '/album' },
     { icon: ShoppingBag, label: '굿즈', href: '/goods' },
-    { icon: Download, label: '다운로드', href: '/download', mobileHidden: true },
-    { icon: Mail, label: '메시지', href: '/messages' },
+    // { icon: Download, label: '다운로드', href: '/download', mobileHidden: true }
+    // { icon: Mail, label: '메시지', href: '/messages' },
   ]
 
   useEffect(() => {
@@ -54,8 +54,9 @@ export default function ResponsiveLayout({
         toast({
           variant: "destructive",
           title: "프로필 로드 실패",
-          description: "사용자 정보를 불러오는데 실패했습니다.",
+          description: "클라이언트에서 계정생성을 완료해주세요.",
         })
+        router.push('/')
       }
     }
 
@@ -119,7 +120,7 @@ export default function ResponsiveLayout({
                 <div className="flex items-center gap-2 mt-1 p-1">
                   <Avatar className="h-9 w-9 border">
                     <AvatarImage 
-                      src={mainPageData.petDTO.textureUrl || "/pet-placeholder.png"} 
+                      src={mainPageData.petImg || "/pet-placeholder.png"} 
                       alt={mainPageData.petDTO.name} 
                     />
                     <AvatarFallback>{mainPageData.petDTO.name[0]}</AvatarFallback>
@@ -136,10 +137,8 @@ export default function ResponsiveLayout({
       <main className="flex-1 md:ml-64 md:p-8 overflow-y-auto h-screen">
         {children}
       </main>
-
-      {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t h-16 flex items-center justify-around z-10">
-        {navItems.filter(item => !item.mobileHidden).map((item) => (
+          {navItems.map((item) => (
           <Link
             key={item.href}
             href={item.href}
